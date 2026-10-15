@@ -1,0 +1,11 @@
+{
+  "name": "shopkart",
+  "private": true,
+  "version": "1.0.0",
+  "engines": { "node": "24.x" },
+  "scripts": {
+    "build": "npm run build --prefix frontend",
+    "test": "npm test --prefix backend",
+    "db:check": "npm run db:check --prefix backend"
+  }
+}

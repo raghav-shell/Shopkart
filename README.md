@@ -11,8 +11,9 @@ a persistent cart, and Razorpay Test Mode checkout.
 ![Express](https://img.shields.io/badge/Express-API-20232A?style=flat-square&logo=express&logoColor=white)
 ![MongoDB](https://img.shields.io/badge/MongoDB-Database-237A3B?style=flat-square&logo=mongodb&logoColor=white)
 ![Razorpay](https://img.shields.io/badge/Razorpay-Test_Mode-305EFF?style=flat-square&logo=razorpay&logoColor=white)
+![Vercel](https://img.shields.io/badge/Vercel-Deployed-000000?style=flat-square&logo=vercel&logoColor=white)
 
-[Explore the app](#a-look-inside) · [Run locally](#getting-started) · [API reference](#api-reference) · [Project structure](#project-structure)
+[Live app](https://shopkart-mu-lime.vercel.app) · [Explore the app](#a-look-inside) · [Run locally](#getting-started) · [API reference](#api-reference) · [Project structure](#project-structure) · [Deploy on Vercel](docs/DEPLOYMENT.md)
 
 <img src="docs/screenshots/storefront.png" alt="ShopKart storefront with its green hero, featured product collage, navigation, and demo customer profile" width="100%" />
 
@@ -23,6 +24,24 @@ a persistent cart, and Razorpay Test Mode checkout.
 ShopKart brings the shopping journey into one cohesive application: create an account, discover products, save favorites, manage quantities, and place an order through a verified test payment. A warm cream palette, green accents, editorial typography, and eight selectable themes give the interface its character.
 
 Built as an engineering lab project, the repository includes both the React client and the Express API, with MongoDB persistence for customers, products, carts, wishlists, and orders.
+
+## Live deployment
+
+**[Visit ShopKart →](https://shopkart-mu-lime.vercel.app)**
+
+The React frontend and Express API run together on Vercel, backed by MongoDB Atlas. Browser navigation and `/api` requests share one HTTPS origin.
+
+| Deployment | Details |
+| --- | --- |
+| Application | [shopkart-mu-lime.vercel.app](https://shopkart-mu-lime.vercel.app) |
+| API health | [/api/health](https://shopkart-mu-lime.vercel.app/api/health) |
+| Runtime | Node.js 24 on Vercel |
+| Payments | Razorpay **Test Mode** |
+| Last verified | 15 October 2026 |
+
+Production checks covered registration, login, secure cookies, product search, wishlists, cart persistence, and order history. A completed test payment was verified through a **PAID / PLACED** order and an empty cart. Test Mode does not process real payments.
+
+See the [deployment guide](docs/DEPLOYMENT.md) for configuration, environment variables, verification steps, and troubleshooting.
 
 ## A look inside
 
@@ -93,7 +112,7 @@ During development, Vite proxies `/api` requests to Express on port `5001`. Afte
 
 ### Prerequisites
 
-- **Node.js 22.12+** and npm; the backend also uses Node's built-in `fetch`.
+- **Node.js 24 LTS** and npm; the Vercel runtime is pinned to `24.x`.
 - **MongoDB Atlas**, or a local MongoDB instance. Successful payment verification uses a transaction, so checkout requires a replica set or sharded cluster; Atlas supports this.
 - **Razorpay test keys** to exercise payments. Accounts, browsing, wishlists, and carts can be used without payment keys.
 
@@ -166,7 +185,7 @@ curl -X POST http://localhost:5001/api/products \
   }'
 ```
 
-Product creation is intentionally unauthenticated for the lab. Restrict it to authorized administrators before exposing the API publicly.
+Product creation is open in local development when `PRODUCT_WRITE_KEY` is unset. In production it requires a server-only `PRODUCT_WRITE_KEY`, supplied as the `X-Product-Key` header; creation is denied if no key is configured. Never put this key in frontend code.
 
 ## Checkout and orders
 
@@ -185,12 +204,13 @@ The browser uses the `/api` prefix. For existing lab clients, equivalent routes 
 
 | Method | Endpoint | Authentication | Purpose |
 | --- | --- | --- | --- |
+| `GET` | `/api/health` | Public | Check database connectivity |
 | `POST` | `/api/customers/register` | Public | Create a customer account |
 | `POST` | `/api/customers/login` | Public | Sign in and set the HttpOnly token cookie |
 | `GET` | `/api/customers/me` | Required | Retrieve the current customer |
 | `POST` | `/api/customers/logout` | Required | Clear the login cookie |
 | `PATCH` | `/api/customers/change-password` | Required | Change the current password |
-| `POST` | `/api/products` | Public, lab use | Create a product |
+| `POST` | `/api/products` | Write key in production | Create a product |
 | `GET` | `/api/products` | Public | List, search, filter, and sort products |
 | `GET` | `/api/products/:id` | Public | Retrieve one product |
 | `GET` | `/api/wishlist` | Required | Retrieve saved products |
@@ -215,6 +235,8 @@ GET /api/products?search=backpack&category=Accessories&sort=price_asc
 
 ```text
 Shopkart/
+├── api/
+│   └── index.js            # Vercel API entry point
 ├── frontend/
 │   ├── src/
 │   │   ├── components/     # Navigation, product cards, cart controls, shared layout
@@ -225,14 +247,21 @@ Shopkart/
 │   │   └── styles.css      # Application styling and themes
 │   └── vite.config.js      # React plugin and development API proxy
 ├── backend/
+│   ├── config/             # Shared MongoDB connection management
 │   ├── controllers/        # Authentication, products, wishlist, cart, and orders
 │   ├── middlewares/        # JWT authentication
 │   ├── models/             # Customer, product, and order schemas
 │   ├── routes/             # Express endpoint definitions
+│   ├── scripts/            # Read-only database diagnostic
+│   ├── tests/              # Deployment regression tests
 │   ├── utils/              # Token generation
 │   ├── .env.example        # Environment variable template
 │   └── index.js            # Server startup, static client, and API mounting
-└── docs/screenshots/        # Real application captures used in this README
+├── docs/
+│   ├── screenshots/        # Real application captures used in this README
+│   └── DEPLOYMENT.md       # Vercel setup and release verification
+├── package.json            # Root build, test, and database-check commands
+└── vercel.json             # Hosted build, static output, and API routing
 ```
 
 ## Build and verification
@@ -244,7 +273,18 @@ npm start --prefix backend
 
 After building, open **http://localhost:5001** to use the client served by Express. Keep `PORT=5001` during Vite development unless you also update the proxy target. Browser routes such as `/products`, `/cart`, and `/orders` support direct navigation and refresh.
 
-There is currently no automated test script. A useful manual check is to register and sign in, search the catalog, save a wishlist item, update cart quantities, complete a test checkout, and confirm the order appears in history. Payment completion requires valid Razorpay test keys and MongoDB transaction support.
+Run deployment regression tests and a read-only database check from the repository root:
+
+```bash
+npm test
+npm run db:check
+```
+
+The regression tests cover connection reuse and retries, API responses, production product-write protection, and error redaction. They mock database operations. The separate database check connects to your configured database, pings it, and checks transaction support without modifying application data.
+
+Before release, also register and sign in, search the catalog, save a wishlist item, update cart quantities, complete a test checkout, and confirm the order appears in history. Payment completion requires valid Razorpay test keys and MongoDB transaction support.
+
+For the full Vercel configuration, Atlas network setup, environment variables, and release checks, see the [deployment guide](docs/DEPLOYMENT.md).
 
 <details>
 <summary><strong>Troubleshooting</strong></summary>
